@@ -176,6 +176,11 @@ class BuildTest(unittest.TestCase):
             "int memcpy2(int);\n\nint func_08000100(int a) { return memcpy2(a); }\n", "undefined symbol memcpy2"
         )
 
+    def test_no_host_macros(self):
+        # the preprocessor must not leak the host's predefined macros into headers
+        put(os.path.join(self.r, "include", "host.h"), "#if defined(__x86_64__) || defined(__linux__)\n#error host\n#endif\n")
+        self.assertEqual(self.solve('#include "host.h"\n\n' + CALL), [])
+
     @unittest.skipUnless(shutil.which("clang-format"), "clang-format not installed")
     def test_lint(self):
         self.assertRejects(CALL.replace("int func_08000100(int a) {", "int func_08000100(int a)\n{"), "clang-format")

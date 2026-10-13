@@ -101,7 +101,7 @@ def check_object(o, addr, cfg):
 
 def build(path, addr, root, cfg, d):
     """Compile path and link it at addr. Returns the .text bytes. Raises CheckError."""
-    pp = run(["arm-none-eabi-cpp", "-nostdinc", "-I", os.path.join(root, "include"),
+    pp = run(["cpp", "-nostdinc", "-undef", "-I", os.path.join(root, "include"),
               "-I", os.path.join(root, "tools", "agbcc", "include"), path])
     s, o, so, elf, b = (os.path.join(d, x) for x in ("f.s", "f.o", "syms.o", "f.elf", "f.bin"))
     run([os.path.join(root, cfg["compiler"])] + cfg["cflags"] + ["-o", s], input=pp)
