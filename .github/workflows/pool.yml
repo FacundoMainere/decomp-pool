@@ -1,0 +1,90 @@
+# Validates claim / release / solve PRs and merges them. Runs the BASE branch's workflow and
+# tools (pull_request_target); the PR is only read as git data and never checked out or run.
+name: Pool
+
+on:
+  pull_request_target:
+    types: [opened, synchronize, reopened]
+
+permissions: {}
+
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    outputs:
+      kind: ${{ steps.result.outputs.kind }}
+      ok: ${{ steps.result.outputs.ok }}
+      reason: ${{ steps.result.outputs.reason }}
+    env:
+      AUTHOR: ${{ github.event.pull_request.user.login }}
+      CREATED: ${{ github.event.pull_request.created_at }}
+      PR: ${{ github.event.pull_request.number }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          fetch-depth: 0
+          persist-credentials: false
+      - run: git fetch -q --no-tags origin "+refs/pull/$PR/head:refs/pr/head"
+      - id: state
+        run: |
+          python3 tools/pool.py validate --author "$AUTHOR" --created "$CREATED" --ref refs/pr/head --state-only > result.json || true
+          cat result.json
+          echo "kind=$(jq -r .kind result.json)" >> "$GITHUB_OUTPUT"
+          echo "ok=$(jq -r .ok result.json)" >> "$GITHUB_OUTPUT"
+      - if: steps.state.outputs.kind == 'solve' && steps.state.outputs.ok == 'true'
+        uses: ./.github/actions/tools
+      - if: steps.state.outputs.kind == 'solve' && steps.state.outputs.ok == 'true'
+        run: |
+          python3 tools/pool.py validate --author "$AUTHOR" --created "$CREATED" --ref refs/pr/head > result.json || true
+          cat result.json
+      - id: result
+        run: |
+          echo "kind=$(jq -r .kind result.json)" >> "$GITHUB_OUTPUT"
+          echo "ok=$(jq -r .ok result.json)" >> "$GITHUB_OUTPUT"
+          echo "reason=$(jq -c .reason result.json)" >> "$GITHUB_OUTPUT"
+
+  merge:
+    needs: verify
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+      pull-requests: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      REPO: ${{ github.repository }}
+      PR: ${{ github.event.pull_request.number }}
+      AUTHOR: ${{ github.event.pull_request.user.login }}
+      CREATED: ${{ github.event.pull_request.created_at }}
+      KIND: ${{ needs.verify.outputs.kind }}
+      REASON: ${{ fromJSON(needs.verify.outputs.reason) }}
+    steps:
+      - if: needs.verify.outputs.kind == 'manual' && github.event.action == 'opened' && !contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.pull_request.author_association)
+        run: gh pr comment "$PR" --repo "$REPO" --body "Not a claim, release or solve PR, so it is not merged automatically. A maintainer will review it. See AGENTS.md."
+      - if: needs.verify.outputs.kind != 'manual' && needs.verify.outputs.ok != 'true'
+        run: |
+          printf 'Rejected (%s):\n\n```\n%s\n```\n\nPush a fix to this PR or close it. See AGENTS.md.\n' "$KIND" "$REASON" > body.md
+          gh pr comment "$PR" --repo "$REPO" --body-file body.md
+      - if: needs.verify.outputs.ok == 'true'
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          fetch-depth: 0
+          persist-credentials: false
+      # Re-check against main as it is now: another PR may have merged since verify started.
+      - if: needs.verify.outputs.ok == 'true'
+        run: |
+          git fetch -q --no-tags origin "+refs/pull/$PR/head:refs/pr/head"
+          python3 tools/pool.py validate --author "$AUTHOR" --created "$CREATED" --ref refs/pr/head --state-only > result.json || true
+          cat result.json
+          if [ "$(jq -r .ok result.json)" != true ]; then
+            printf 'Rejected on re-check (%s):\n\n```\n%s\n```\n' "$KIND" "$(jq -r .reason result.json)" > body.md
+            gh pr comment "$PR" --repo "$REPO" --body-file body.md
+            exit 1
+          fi
+          if ! gh pr merge "$PR" --repo "$REPO" --squash; then
+            gh pr comment "$PR" --repo "$REPO" --body "Could not merge, most likely a conflict: someone claimed or solved this function first. Sync your fork and pick another function."
+            exit 1
+          fi

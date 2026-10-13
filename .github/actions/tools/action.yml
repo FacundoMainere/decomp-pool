@@ -1,0 +1,17 @@
+name: Install tools
+description: binutils, agbcc (cached) and clang-format
+runs:
+  using: composite
+  steps:
+    - shell: bash
+      run: sudo apt-get update -q && sudo apt-get install -yq binutils-arm-none-eabi
+    - id: cache
+      uses: actions/cache@v4
+      with:
+        path: tools/agbcc
+        key: agbcc-${{ hashFiles('tools/install_agbcc.sh') }}
+    - if: steps.cache.outputs.cache-hit != 'true'
+      shell: bash
+      run: tools/install_agbcc.sh
+    - shell: bash
+      run: pip install -q clang-format==18.1.8
