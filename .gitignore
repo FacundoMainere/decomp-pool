@@ -1,4 +1,4 @@
 *.gba
-tools/agbcc/
+tools/agbcc
 __pycache__/
 funcs.csv
