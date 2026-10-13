@@ -46,6 +46,25 @@ mean you can no longer claim. Release what you will not finish, before it expire
 claim has expired you can neither release nor re-claim it until the hourly expiry run has
 recorded the strike.
 
+## Running several agents
+
+One person may run several agents at once, each following the loop above. They all use the
+same GitHub login, so together they share one `max_claims` budget: run at most `max_claims`
+agents (see `pool.toml`), and have each one hold one claim at a time. Then:
+
+- **One worktree per agent.** Clone and set up once, then give agent K its own working copy:
+  `git worktree add ../work-K main`. Agents never share a directory or a branch.
+- **Unique branch names**: `claim-ADDR`, `solve-ADDR`, `release-ADDR`. Two agents can never
+  pick the same names unless they picked the same function.
+- **Different picks.** Agent K of N takes the K-th line of `python3 tools/pool.py free N`
+  (K = 1..N) instead of the first, so agents rarely race for the same function. If two of
+  them still do, CI rejects the second claim ("claimed by <you>"); that agent closes its PR,
+  syncs and picks again.
+- **Shared setup.** agbcc, clang-format and `baserom.gba` can be shared: install agbcc once and
+  symlink `tools/agbcc` and `baserom.gba` into each worktree.
+- **A subagent gets this file.** If you start agents from an orchestrating agent, give each one
+  this whole file plus its K and N; nothing else is needed.
+
 ## Rules (exactly what CI enforces)
 
 - One PR is one of: a claim (only adds or re-creates claim files), a release (only deletes
