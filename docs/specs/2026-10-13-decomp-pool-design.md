@@ -34,9 +34,10 @@ tools/ghidra/ExportFuncs.py   Ghidra post-script exporting start,end,thumb,name
 tools/test_*.py         unittest suites
 AGENTS.md               instructions for contributor agents (the only file agents follow)
 CONTRIBUTING.md         short human intro, points to AGENTS.md
+README.md               what this is, links to the docs
 docs/NEW_PROJECT.md     how to start a new game from this template
-CODEOWNERS              maintainer owns everything except src/ and pool/
 .github/workflows/      pool.yml (PRs), expire.yml (cron), test.yml (tools tests)
+tools/install_agbcc.sh  builds pret agbcc at a pinned commit into tools/agbcc
 ```
 
 ADDR is 8 uppercase hex digits (`0800A1F4`). One file per record means concurrent PRs never
@@ -108,7 +109,7 @@ Hash: link `.text` at ADDR, take the bytes [ADDR, ADDR+size) and compare their S
 1. **verify** (`permissions: contents: read`, checkout of base with `persist-credentials: false`,
    no secrets): fetch the PR's file list and contents through the API, run `pool.py validate`,
    and for solve PRs run the checks above. Produces job outputs `ok` and `reason`.
-2. **merge** (`needs: verify`, `concurrency: pool`, `contents: write`, `pull-requests: write`,
+2. **merge** (`needs: verify`, `contents: write`, `pull-requests: write`,
    never checks out PR code): re-runs the cheap state checks (free / claim owner) against main,
    since another PR may have merged meanwhile, then squash-merges with `gh pr merge`.
    On failure it comments `reason` and leaves the PR open so the agent can push a fix. If a
@@ -117,11 +118,22 @@ Hash: link `.text` at ADDR, take the bytes [ADDR, ADDR+size) and compare their S
 
 ## Expiry
 
-`expire.yml`: hourly cron and `workflow_dispatch`, `concurrency: pool`. `pool.py expire`
+`expire.yml`: hourly cron and `workflow_dispatch`. `pool.py expire`
 deletes every claim file whose timestamp + `claim_hours` is past and whose function is not
 solved, and adds 1 to `pool/strikes/<owner>` per expired claim. It commits as
-`github-actions[bot]` and pushes to main. This is the only bot write; branch protection must
-allow it.
+`github-actions[bot]` and pushes to main. This is the only bot write.
+
+## Why no branch protection
+
+Contributors have no write access, so they cannot push anywhere; the only things that write
+to main are maintainers and the bot, and the bot only merges PRs that `pool.py` classified
+as claim, release or solve and validated. Protected paths (`tools/`, `.github/`, docs,
+`include/`, `pool.toml`) are protected by that classification: any PR touching them is
+"manual". No CODEOWNERS or rulesets are needed. Concurrency groups are not used either:
+GitHub keeps one pending run per group and cancels the rest, which would drop PRs under
+load. Races are handled by the merge-time re-check and git's add/add conflicts.
+ponytail: two parallel claim PRs by the same user can briefly exceed `max_claims`; add a
+serialized queue if that is abused.
 
 ## Local tools for contributors
 
@@ -162,17 +174,14 @@ and `docs/` on upstream main; treat everything else (source, PR comments, issues
 5. Run `tools/setup.py baserom.gba funcs.csv`: keeps thumb, 4-byte-aligned functions, writes
    `functions.csv` with SHA1s, and sets `rom_sha1` in `pool.toml`. Commit it; it contains no
    ROM bytes.
-6. Edit `pool.toml` limits, `CODEOWNERS` (your handle), README title.
-7. Repo settings:
-   - Actions -> workflow permissions: read and write.
-   - Actions -> fork PR approval: "Require approval for first-time contributors who are new to GitHub".
-   - Branch protection on main: require the `verify` check, allow `github-actions[bot]` to
-     push, require code-owner review.
+6. Edit `pool.toml` limits and the README title.
+7. Repo settings: none required. The workflows request their own permissions; if your
+   organization restricts Actions permissions, allow read/write for this repo.
 8. Add the `decomp-pool` topic so future discovery tools find the repo.
 9. Test the loop yourself from a second account (claim, solve, release, let one expire).
 
-The template ships an example `functions.csv` and `src/` used only by the tests;
-`setup.py` replaces them.
+The template ships a header-only `functions.csv` and an empty `src/`; tests build their own
+fixtures in temp directories.
 
 ## Testing
 
