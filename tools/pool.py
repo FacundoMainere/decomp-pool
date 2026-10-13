@@ -180,3 +180,48 @@ def expire(root, now, cfg):
                 with open(p, "w") as f:
                     f.write("%d\n" % (n + 1))
     return gone
+
+
+def git(root, *args):
+    return subprocess.run(["git", "-C", root, *args], capture_output=True, text=True, errors="replace", check=True).stdout
+
+
+def pr_changes(ref, root=ROOT):
+    """The PR's own changes (merge base of HEAD and ref -> ref) and the new file contents.
+    Reads git objects only; nothing from the PR is checked out or executed."""
+    out = git(root, "diff", "--name-status", "--no-renames", "HEAD..." + ref)
+    changes = [tuple(line.split("\t", 1)) for line in out.splitlines()]
+    contents = {p: git(root, "show", "%s:%s" % (ref, p)) for s, p in changes if s != "D"}
+    return changes, contents
+
+
+def main():
+    ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    sub = ap.add_subparsers(dest="cmd", required=True)
+    f = sub.add_parser("free")
+    f.add_argument("n", nargs="?", type=int, default=20)
+    v = sub.add_parser("validate")
+    v.add_argument("--author", required=True)
+    v.add_argument("--created", required=True, help="PR creation time, YYYY-MM-DDTHH:MM:SSZ")
+    v.add_argument("--ref", required=True, help="git ref of the PR head")
+    v.add_argument("--state-only", action="store_true", help="skip compiling (claims, the merge re-check)")
+    sub.add_parser("expire")
+    a = ap.parse_args()
+    cfg, now = load_config(), dt.datetime.now(UTC)
+    if a.cmd == "free":
+        funcs = load_functions()
+        for addr in free(ROOT, now, cfg)[: a.n]:
+            print(addr, funcs[addr][0])
+    elif a.cmd == "validate":
+        changes, contents = pr_changes(a.ref)
+        kind, errs = validate(ROOT, changes, contents, a.author, parse_ts(a.created), now, cfg, a.state_only)
+        print(json.dumps({"kind": kind, "ok": not errs, "reason": "\n".join(errs)[:3000]}))
+        return 1 if errs else 0
+    else:
+        for addr, user in expire(ROOT, now, cfg):
+            print("expired %s (%s)" % (addr, user))
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

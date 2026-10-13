@@ -1,6 +1,7 @@
 import datetime as dt
 import os
 import shutil
+import subprocess
 import sys
 import tempfile
 import unittest
@@ -162,6 +163,32 @@ class ExpireTest(PoolTest):
         self.assertEqual(pool.expire(root, NOW, CFG), [("08000100", "Juan")])
         self.assertEqual(sorted(pool.read_claims(root)), ["08000200"])
         self.assertEqual(pool.read_strikes(root), {"juan": 2})
+
+
+
+
+class GitTest(unittest.TestCase):
+    def test_stale_fork(self):
+        root = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, root)
+        g = lambda *a: subprocess.run(["git", "-C", root, *a], check=True, capture_output=True, text=True).stdout
+        g("init", "-q", "-b", "main")
+        g("config", "user.email", "t@t")
+        g("config", "user.name", "t")
+        write(root, "functions.csv", "addr,size,sha1\n")
+        g("add", "-A")
+        g("commit", "-qm", "base")
+        g("checkout", "-qb", "pr")
+        write(root, "pool/claims/08000100", "juan " + ts() + "\n")
+        g("add", "-A")
+        g("commit", "-qm", "claim")
+        g("checkout", "-q", "main")
+        write(root, "pool/claims/08000200", "ema " + ts() + "\n")  # main moved on after the fork
+        g("add", "-A")
+        g("commit", "-qm", "other claim")
+        changes, contents = pool.pr_changes("pr", root)
+        self.assertEqual(changes, [("A", "pool/claims/08000100")])
+        self.assertEqual(contents, {"pool/claims/08000100": "juan " + ts() + "\n"})
 
 if __name__ == "__main__":
     unittest.main()
