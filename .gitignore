@@ -1,0 +1,3 @@
+*.gba
+tools/agbcc/
+__pycache__/
