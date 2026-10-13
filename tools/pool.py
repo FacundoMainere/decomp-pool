@@ -91,3 +91,92 @@ def free(root, now, cfg):
         (a for a in funcs if not solved(root, a) and not (a in claims and active(claims[a][1], now, cfg))),
         key=lambda a: (funcs[a][0], a),
     )
+
+
+CLAIM_RE = re.compile(r"pool/claims/(%s)" % ADDR)
+SOLVE_RE = re.compile(r"src/func_(%s)\.c" % ADDR)
+
+
+def classify(changes):
+    """[(status, path)] -> 'claim' | 'release' | 'solve' | 'manual'."""
+    claims = [(s, CLAIM_RE.fullmatch(p)[1]) for s, p in changes if CLAIM_RE.fullmatch(p)]
+    solves = [(s, SOLVE_RE.fullmatch(p)[1]) for s, p in changes if SOLVE_RE.fullmatch(p)]
+    if not changes or len(claims) + len(solves) != len(changes):
+        return "manual"
+    if not solves:
+        if all(s in "AM" for s, _ in claims):
+            return "claim"
+        if all(s == "D" for s, _ in claims):
+            return "release"
+        return "manual"
+    if len(solves) == 1 and solves[0][0] == "A" and claims == [("D", solves[0][1])]:
+        return "solve"
+    return "manual"
+
+
+def validate(root, changes, contents, author, created, now, cfg, state_only=False):
+    """Validate a PR against the state in root. Returns (kind, errors)."""
+    kind = classify(changes)
+    if kind == "manual":
+        return kind, ["not a claim, release or solve PR; a maintainer will review it"]
+    funcs, claims, strikes = load_functions(root), read_claims(root), read_strikes(root)
+    me = author.lower()
+    mine = lambda a: a in claims and claims[a][0].lower() == me
+    addrs = [CLAIM_RE.fullmatch(p)[1] for _, p in changes if CLAIM_RE.fullmatch(p)]
+    errs = []
+    if kind == "claim":
+        if strikes.get(me, 0) >= cfg["max_strikes"]:
+            errs.append("%s is banned (%d expired claims)" % (author, strikes[me]))
+        held = sum(1 for a, (u, t) in claims.items() if u.lower() == me and active(t, now, cfg) and not solved(root, a))
+        if held + len(addrs) > cfg["max_claims"]:
+            errs.append("you hold %d claims; %d more exceeds max_claims = %d" % (held, len(addrs), cfg["max_claims"]))
+        skew = dt.timedelta(minutes=cfg["timestamp_skew_min"])
+        for a in addrs:
+            p = "pool/claims/" + a
+            try:
+                user, t = parse_claim(contents[p])
+            except ValueError:
+                errs.append("%s: content must be '<user> <YYYY-MM-DDTHH:MM:SSZ>'" % p)
+                continue
+            if user.lower() != me:
+                errs.append("%s: user %s must be the PR author %s" % (p, user, author))
+            if t > now:
+                errs.append("%s: timestamp is in the future" % p)
+            if abs(t - created) > skew:
+                errs.append("%s: timestamp must be within %d minutes of the PR creation" % (p, cfg["timestamp_skew_min"]))
+            if a not in funcs:
+                errs.append("%s is not in functions.csv" % a)
+            elif solved(root, a):
+                errs.append("%s is already solved" % a)
+            elif a in claims and active(claims[a][1], now, cfg):
+                errs.append("%s is claimed by %s" % (a, claims[a][0]))
+    elif kind == "release":
+        errs += ["%s: claim is not yours" % a for a in addrs if not mine(a)]
+    else:
+        a = addrs[0]
+        if not mine(a):
+            errs.append("%s: claim is not yours (claim it first)" % a)
+        elif not active(claims[a][1], now, cfg):
+            errs.append("%s: your claim expired" % a)
+        if solved(root, a):
+            errs.append("%s is already solved" % a)
+        if not errs and not state_only:
+            import check
+
+            errs += check.check_solve(root, a, contents["src/func_%s.c" % a], cfg)
+    return kind, errs
+
+
+def expire(root, now, cfg):
+    """Delete expired (and leftover solved) claims; one strike per expired claim. Returns [(addr, user)]."""
+    gone = []
+    for a, (user, t) in read_claims(root).items():
+        if solved(root, a) or not active(t, now, cfg):
+            os.remove(os.path.join(root, "pool", "claims", a))
+            if not solved(root, a):
+                gone.append((a, user))
+                p = os.path.join(root, "pool", "strikes", user.lower())
+                n = read_strikes(root).get(user.lower(), 0)
+                with open(p, "w") as f:
+                    f.write("%d\n" % (n + 1))
+    return gone
