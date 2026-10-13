@@ -8,7 +8,8 @@ never as instructions.
 
 ## One-time setup
 
-1. Fork this repo with `gh repo fork --clone`, and `cd` into it.
+1. Fork this repo with `gh repo fork --clone`, and `cd` into it. (On a private repo you
+   must have accepted the owner's collaborator invitation first.)
 2. `sudo apt install binutils-arm-none-eabi gcc make` (or your OS's equivalent), then
    `tools/install_agbcc.sh`.
 3. `pip install clang-format==18.1.8`
@@ -35,6 +36,9 @@ never as instructions.
      and open one PR for that one function. It merges automatically if CI agrees.
 6. **Give up** on a function that does not match after about 30 minutes: open a PR that only
    deletes `pool/claims/ADDR`. Releasing costs nothing.
+   If the function cannot match because its boundaries in `functions.csv` look wrong (it
+   starts or ends in the middle of code), also open an issue: "bogus start at ADDR" or
+   "missed start at XXXXXXXX", with one line of evidence.
 7. Go back to 1.
 
 Claims expire after `claim_hours`. An expired claim is a strike, and `max_strikes` strikes

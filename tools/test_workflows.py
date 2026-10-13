@@ -22,5 +22,10 @@ class PoolWorkflowTest(unittest.TestCase):
         self.assertIn('--body ""', merge)
 
 
+    def test_token_only_kept_for_private_repos(self):
+        # a public repo fetches anonymously; a private one needs the job token to fetch the PR
+        self.assertEqual(self.wf.count("persist-credentials: ${{ github.event.repository.private }}"), 2)
+        self.assertNotIn("persist-credentials: false", self.wf)
+
 if __name__ == "__main__":
     unittest.main()
