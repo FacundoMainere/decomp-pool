@@ -1633,7 +1633,7 @@ Unofficial and not affiliated with any rights holder. The tooling and docs are M
 
 Simulate what `pool.yml` does, in a scratch clone with a fake function:
 ```bash
-D=$(mktemp -d) && git clone -q . "$D" && cd "$D"
+D=$(mktemp -d) && git clone -q . "$D" && cd "$D" && git checkout -qB main
 ln -s "$OLDPWD/tools/agbcc" tools/agbcc
 # a one-function pool: the bytes of `int func_08000100(int a) { return a + 1; }`
 F=$(mktemp --suffix=.c)
