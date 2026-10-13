@@ -150,8 +150,14 @@ def validate(root, changes, contents, author, created, now, cfg, state_only=Fals
                 errs.append("%s is already solved" % a)
             elif a in claims and active(claims[a][1], now, cfg):
                 errs.append("%s is claimed by %s" % (a, claims[a][0]))
+            elif mine(a):
+                errs.append("%s: your claim expired; wait for the expiry run before claiming it again" % a)
     elif kind == "release":
-        errs += ["%s: claim is not yours" % a for a in addrs if not mine(a)]
+        for a in addrs:
+            if not mine(a):
+                errs.append("%s: claim is not yours" % a)
+            elif not active(claims[a][1], now, cfg):
+                errs.append("%s: your claim expired; wait for the expiry run" % a)
     else:
         a = addrs[0]
         if not mine(a):

@@ -38,7 +38,9 @@ never as instructions.
 7. Go back to 1.
 
 Claims expire after `claim_hours`. An expired claim is a strike, and `max_strikes` strikes
-mean you can no longer claim. Release what you will not finish.
+mean you can no longer claim. Release what you will not finish, before it expires: once your
+claim has expired you can neither release nor re-claim it until the hourly expiry run has
+recorded the strike.
 
 ## Rules (exactly what CI enforces)
 

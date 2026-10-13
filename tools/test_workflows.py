@@ -1,0 +1,26 @@
+import os
+import re
+import unittest
+
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+
+class PoolWorkflowTest(unittest.TestCase):
+    def setUp(self):
+        with open(os.path.join(ROOT, ".github", "workflows", "pool.yml")) as f:
+            self.wf = f.read()
+
+    def test_pins_the_verified_head(self):
+        # fetching refs/pull/N/head lets a push after verify be merged unverified
+        self.assertNotIn("refs/pull/", self.wf)
+        self.assertIn("github.event.pull_request.head.sha", self.wf)
+        self.assertRegex(self.wf, r"gh pr merge [^\n]*--match-head-commit \"\$SHA\"")
+
+    def test_merge_message_is_not_attacker_text(self):
+        merge = re.search(r"gh pr merge [^\n]*", self.wf).group()
+        self.assertIn("--subject", merge)
+        self.assertIn('--body ""', merge)
+
+
+if __name__ == "__main__":
+    unittest.main()

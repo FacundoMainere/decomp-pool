@@ -190,5 +190,15 @@ class GitTest(unittest.TestCase):
         self.assertEqual(changes, [("A", "pool/claims/08000100")])
         self.assertEqual(contents, {"pool/claims/08000100": "juan " + ts() + "\n"})
 
+class StrikeDodgeTest(PoolTest):
+    def test_owner_cannot_release_or_reclaim_expired(self):
+        root = self.root(claims={"08000100": "juan " + ts(49)})
+        _, errs = pool.validate(root, [("D", "pool/claims/08000100")], {}, "juan", NOW, NOW, CFG, True)
+        self.assertTrue(any("wait for the expiry run" in e for e in errs), errs)
+        _, errs = claim_pr(root, ["08000100"], author="Juan", user="Juan", status="M")
+        self.assertTrue(any("wait for the expiry run" in e for e in errs), errs)
+        # another user may still take it over
+        self.assertEqual(claim_pr(root, ["08000100"], author="ema", status="M")[1], [])
+
 if __name__ == "__main__":
     unittest.main()
