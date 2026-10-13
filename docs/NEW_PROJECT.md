@@ -11,8 +11,10 @@ integrating `src/func_ADDR.c` into one comes later, once enough code exists.
 ## 1. Create the repository
 
 ```sh
-gh repo create OWNER/GAME-decomp --private --template OWNER/decomp-pool --clone
-cd GAME-decomp
+gh repo create OWNER/GAME-decomp --private --template OWNER/decomp-pool
+sleep 10                                    # GitHub copies the template asynchronously
+gh repo clone OWNER/GAME-decomp && cd GAME-decomp
+git log --oneline                           # must show one "Initial commit"; if empty, wait and pull
 ```
 
 Use `--public` instead for an open project: public repos get unlimited Actions minutes and
