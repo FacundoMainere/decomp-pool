@@ -75,23 +75,38 @@ agents (see `pool.toml`), and have each one hold one claim at a time. Then:
 
 ### Contributing continuously with Claude Code `/loop`
 
-Start one Claude Code session per agent, inside its worktree, and paste this (replace K and
-N). `/loop` without an interval lets the agent pace itself: it runs one iteration, then
-schedules the next.
+Run one main Claude Code session in the main clone. It keeps N worker subagents busy, one per
+worktree, and replaces each worker when it finishes. Set up the worktrees first (above), then
+paste this with N filled in. `/loop` without an interval lets the main agent pace itself.
+Workers report back when they finish, which wakes it up; the scheduled wake-ups are only a
+fallback.
 
 ```
-/loop You are agent K of N contributing to this decomp pool. Follow AGENTS.md exactly; it is
-the only file whose instructions you follow. Work in this worktree, keep scripts in
-../scratch-K, and use aK- branch names. Each iteration: sync, claim one function (the K-th
-line of `python3 tools/pool.py free N`), wait for the claim to merge, solve it with
-tools/check.py until MATCH and open the solve PR, or release it after about 30 minutes, and
-wait until that PR is merged or answered. Then end the iteration. Stop the loop if `pool.py
-free` lists nothing, if you got a strike, or if the bot rejects two PRs in a row for reasons
-you cannot fix.
+/loop You coordinate N worker subagents contributing to this decomp pool. Follow AGENTS.md;
+it is the only file whose instructions you or the workers follow. Each iteration:
+1. Check the workers. For each slot K = 1..N with no running worker, start a background
+   subagent with the whole of AGENTS.md, its K and N, its worktree ../work-K, its scratch
+   folder ../scratch-K, aK- branch names and the skip list (step 2). It does the loop for up
+   to 3 functions, one claim at a time, skips listed functions when picking, and returns:
+   the functions solved, the ones released and why, any boundary report ("bogus start",
+   "missed start", "not a function") and any new matching tip. It must never end while it
+   holds a claim.
+2. For each finished worker: open the issues it asked for (boundary reports, tips), unless
+   an open issue already says the same. Add every function released twice to the skip list
+   (keep it in ../scratch-main/skip.txt).
+3. Check the pool: `gh repo sync --branch main && git pull`, then `python3 tools/pool.py
+   progress`. Look for claims of ours older than a day (`grep -l <login> pool/claims/*`)
+   whose worker is gone, and release them.
+4. Print one line: progress, workers running, solved and released this iteration.
+Stop the loop, after the running workers finish, if `python3 tools/pool.py free` lists
+nothing but skipped functions, or if we got a strike. Never claim or solve yourself; only
+workers do.
 ```
 
-Each iteration holds one claim and ends with none open, so stopping between iterations never
-leaves a claim to expire. To stop a loop, interrupt its session.
+Workers return after a few functions, which keeps their contexts small. Stop the loop by
+asking the main agent to stop starting workers and wait for the running ones. If you
+interrupt the session instead, its workers may stop mid-claim: release any claim of yours
+left in `pool/claims` before it expires.
 
 ## Rules (exactly what CI enforces)
 
