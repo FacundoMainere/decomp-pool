@@ -74,6 +74,19 @@ class StateTest(PoolTest):
             {"functions": 4, "bytes": 40, "solved": 1, "solved_bytes": 12, "claimed": 1},
         )
 
+    def test_write_progress(self):
+        root = self.root(funcs=("08000100", "08000200"), solved=("08000200",))  # sizes 8, 4
+        doc = "# Progress\n\n<!-- progress:start -->\nold\n<!-- progress:end -->\n\n## Log\n- mine\n"
+        write(root, "docs/PROGRESS.md", doc)
+        self.assertTrue(pool.write_progress(root, NOW, CFG))
+        with open(os.path.join(root, "docs/PROGRESS.md")) as f:
+            text = f.read()
+        self.assertEqual(text, doc.replace("old", pool.progress_line(pool.progress(root, NOW, CFG))))
+        self.assertIn("4 / 12 bytes", text)
+        self.assertFalse(pool.write_progress(root, NOW, CFG))  # unchanged numbers, no rewrite
+        write(root, "docs/PROGRESS.md", "# no markers\n")
+        self.assertFalse(pool.write_progress(root, NOW, CFG))
+
 
 def claim_pr(root, addrs, author="juan", user=None, when=None, status="A"):
     changes = [(status, "pool/claims/" + a) for a in addrs]

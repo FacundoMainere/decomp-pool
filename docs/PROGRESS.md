@@ -2,8 +2,13 @@
 
 Target: GAME (REGION) `GAMECODE`, SHA1 `rom_sha1 from pool.toml`
 
-The maintainer keeps this file; contributors don't edit it. To get the current numbers, run
-`python3 tools/pool.py progress`.
+The maintainer keeps this file; contributors don't edit it. The hourly "Expire claims"
+workflow keeps the line below current (`python3 tools/pool.py progress --write`); leave the
+markers in place.
+
+<!-- progress:start -->
+0 / 0 bytes solved (0.00%), 0 / 0 functions
+<!-- progress:end -->
 
 ## Setup (docs/NEW_PROJECT.md)
 
@@ -26,5 +31,5 @@ The maintainer keeps this file; contributors don't edit it. To get the current n
 
 ## Log
 
-One line per session or milestone: the date, the `pool.py progress` output, and anything
+One line per session or milestone: the date, the progress numbers, and anything
 notable (boundary fixes, new aliases, a new compiler flavour).
