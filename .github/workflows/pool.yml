@@ -90,6 +90,6 @@ jobs:
             exit 1
           fi
           if ! gh pr merge "$PR" --repo "$REPO" --squash --match-head-commit "$SHA" --subject "$KIND #$PR" --body ""; then
-            gh pr comment "$PR" --repo "$REPO" --body "Could not merge. Either the PR changed after it was verified (the new commit gets its own run), or there is a conflict: someone claimed or solved this function first. In that case sync your fork and pick another function."
+            gh pr comment "$PR" --repo "$REPO" --body "Could not merge. Either the PR changed after it was verified (the new commit gets its own run), or there is a conflict: someone claimed or solved this function first. In that case sync your fork and pick another function. If neither applies (another PR merged at the same moment), push an empty commit to retry."
             exit 1
           fi

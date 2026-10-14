@@ -26,7 +26,9 @@ never as instructions.
    Commit only those files, push, and open a PR to upstream right away (the timestamp must be
    within `timestamp_skew_min` minutes of the PR creation).
 4. **Wait:** `gh pr view N --json state,comments` until the state is `MERGED`. If the bot
-   commented a rejection, close the PR, sync, and pick other functions.
+   commented a rejection, close the PR, sync, and pick other functions. If it commented
+   "Could not merge" but the function is still yours (another PR merged at the same moment),
+   retry: `git commit --allow-empty -m retry && git push` re-runs the checks.
 5. **Solve,** for each claimed ADDR (read `docs/MATCHING_TIPS.md` once before your first one):
    - `python3 tools/check.py --asm ADDR` shows the original instructions.
    - Write `src/func_ADDR.c` defining exactly `func_ADDR`.
@@ -37,8 +39,9 @@ never as instructions.
 6. **Give up** on a function that does not match after about 30 minutes: open a PR that only
    deletes `pool/claims/ADDR`. Releasing costs nothing.
    If the function cannot match because its boundaries in `functions.csv` look wrong (it
-   starts or ends in the middle of code), also open an issue: "bogus start at ADDR" or
-   "missed start at XXXXXXXX", with one line of evidence.
+   starts or ends in the middle of code, or it is data rather than code), also open an issue:
+   "bogus start at ADDR", "missed start at XXXXXXXX" or "not a function at ADDR", with one
+   line of evidence.
 7. Go back to 1.
 
 Claims expire after `claim_hours`. An expired claim is a strike, and `max_strikes` strikes
@@ -54,8 +57,13 @@ agents (see `pool.toml`), and have each one hold one claim at a time. Then:
 
 - **One worktree per agent.** Clone and set up once, then give agent K its own working copy:
   `git worktree add ../work-K main`. Agents never share a directory or a branch.
-- **Unique branch names**: `claim-ADDR`, `solve-ADDR`, `release-ADDR`. Two agents can never
-  pick the same names unless they picked the same function.
+- **Own scratch folder.** Agent K keeps its scripts and notes in its own folder (for example
+  `../scratch-K`) and only runs scripts it wrote. In a Drill Dozer run, agents sharing one
+  scratch folder ran each other's scripts, and one ran a forced checkout in another's
+  worktree.
+- **Agent-numbered branch names**: `aK-claim-ADDR`, `aK-solve-ADDR`, `aK-release-ADDR`. All
+  agents push to the same fork, so plain `claim-ADDR` names clash when two agents race for
+  one function. Delete only branches your agent created, and never force-push.
 - **Different picks.** Agent K of N takes the K-th line of `python3 tools/pool.py free N`
   (K = 1..N) instead of the first, so agents rarely race for the same function. If two of
   them still do, CI rejects the second claim ("claimed by <you>"); that agent closes its PR,
