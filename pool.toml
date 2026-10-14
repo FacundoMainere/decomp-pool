@@ -7,6 +7,9 @@ max_source_bytes = 20000
 compiler = "tools/agbcc/bin/agbcc"
 cflags = ["-mthumb-interwork", "-Wimplicit", "-Wparentheses", "-O2", "-fhex-asm", "-fprologue-bugfix"]
 rom_sha1 = ""            # set by tools/setup.py
+# GitHub logins (besides the maintainer) whose boundary PRs and tips are accepted without
+# manual review. Only claims, releases and solves are verified and merged by CI.
+trusted = []
 
 [aliases]
 # Library functions agbcc calls by name, at their ROM address, e.g.

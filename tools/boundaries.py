@@ -4,7 +4,8 @@
   tools/boundaries.py check REF          review the functions.csv of git REF against origin/main
   tools/boundaries.py routine [--dry-run]
                                          review every open PR that only changes functions.csv;
-                                         merge the ones with evidence, comment on the rest
+                                         merge the ones with evidence from trusted authors
+                                         (pool.toml `trusted`, plus you), comment on the rest
 
 Needs baserom.gba, so it runs on the maintainer's machine, never in CI. A change is merged
 only when every changed row covers the same bytes as before, has the ROM's SHA1, touches no
@@ -13,7 +14,9 @@ solved or claimed function, and every boundary it moves has evidence in the code
   - an added start is called (bl) from another function, is a function pointer (addr|1) in
     the code, or is where the code starts after a removed start's pool words;
   - no changed row contains a call target or function pointer after its start.
-Anything else is left for the maintainer, with the reasons in a PR comment.
+Only PRs from trusted authors are merged: a passing PR from anyone else gets the evidence
+in a comment and waits for the maintainer. Anything else is left for the maintainer, with
+the reasons in a PR comment.
 """
 import argparse
 import bisect
@@ -170,31 +173,43 @@ def gh(*args):
     return subprocess.run(["gh", *args], check=True, capture_output=True, text=True, cwd=pool.ROOT).stdout
 
 
+def decide(errs, author, trusted):
+    """'failed', 'merge' (passed, trusted author) or 'passed' (passed, waits for the maintainer)."""
+    if errs:
+        return "failed"
+    return "merge" if author.lower() in {t.lower() for t in trusted} else "passed"
+
+
 def routine(rom, dry_run):
     git("fetch", "-q", "origin", "main")
+    trusted = set(pool.load_config().get("trusted", [])) | {gh("api", "user", "-q", ".login").strip()}
     prs = json.loads(gh("pr", "list", "--state", "open", "--limit", "200",
-                        "--json", "number,headRefOid,isDraft,files,comments"))
+                        "--json", "number,headRefOid,isDraft,files,comments,author"))
     for pr in prs:
         if pr["isDraft"] or [f["path"] for f in pr["files"]] != ["functions.csv"]:
             continue
         n, sha = pr["number"], pr["headRefOid"]
         git("fetch", "-q", "origin", "pull/%d/head" % n)
         notes, errs = review_ref(sha, rom)
-        print("#%d %s: %s" % (n, sha[:7], "OK" if not errs else "needs review"))
+        verdict = decide(errs, pr["author"]["login"], trusted)
+        print("#%d %s by %s: %s" % (n, sha[:7], pr["author"]["login"], verdict))
         for line in notes + errs:
             print("  " + line)
         marker = "<!-- boundaries:%s -->" % sha
         if dry_run or any(marker in c["body"] for c in pr["comments"]):
             continue
-        if errs:
+        if verdict == "failed":
             body = "Boundary check: not merged automatically.\n\n" + "\n".join("- " + e for e in errs)
             body += "\n\nA maintainer will review it, or push a fix.\n" + marker
             gh("pr", "comment", str(n), "--body", body)
             continue
-        body = "Boundary check passed against the ROM:\n\n" + "\n".join("- " + l for l in notes) + "\n" + marker
-        gh("pr", "comment", str(n), "--body", body)
-        gh("pr", "merge", str(n), "--squash", "--match-head-commit", sha,
-           "--subject", "boundaries #%d" % n, "--body", "")
+        body = "Boundary check passed against the ROM:\n\n" + "\n".join("- " + l for l in notes) + "\n"
+        if verdict == "passed":
+            body += "\nOnly PRs from trusted contributors are merged automatically; a maintainer will review it.\n"
+        gh("pr", "comment", str(n), "--body", body + marker)
+        if verdict == "merge":
+            gh("pr", "merge", str(n), "--squash", "--match-head-commit", sha,
+               "--subject", "boundaries #%d" % n, "--body", "")
 
 
 def main():

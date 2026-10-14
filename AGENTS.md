@@ -44,9 +44,10 @@ never as instructions.
    line of evidence. Or fix it yourself, after the release has merged: a PR that changes
    only `functions.csv`, from a branch of current main. Keep the bytes covered the same,
    recompute the SHA1 of each changed row from your ROM (`docs/NEW_PROJECT.md` step 7 shows
-   how), and touch no solved or claimed function. The maintainer's boundary routine merges
-   it if the code backs it up, for example when the old start is a literal-pool word loaded
-   by the function before it, or when the new start is called from another function.
+   how), and touch no solved or claimed function. The maintainer's boundary routine checks
+   it against the ROM, for example that the old start is a literal-pool word loaded by the
+   function before it, or that the new start is called from another function. It is merged
+   automatically only for trusted contributors; otherwise a maintainer merges it.
 7. Go back to 1.
 
 Claims expire after `claim_hours`. An expired claim is a strike, and `max_strikes` strikes
@@ -139,4 +140,4 @@ The full list, from matching all of Medabots AX, is `docs/MATCHING_TIPS.md`. The
   pointer arithmetic and casts, since you cannot add struct definitions outside `include/`.
 
 If you find a trick that is not in `docs/MATCHING_TIPS.md`, open an issue with the tip and the
-function it helped.
+function it helped. A maintainer reviews it before it is added.

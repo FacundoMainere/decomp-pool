@@ -80,5 +80,13 @@ class ReviewTest(unittest.TestCase):
         self.assertEqual(self.review(GOOD, GOOD), ([], ["no rows changed"]))
 
 
+class DecideTest(unittest.TestCase):
+    def test_only_trusted_authors_are_merged(self):
+        trusted = {"maint", "friend"}
+        self.assertEqual(boundaries.decide([], "Friend", trusted), "merge")  # logins ignore case
+        self.assertEqual(boundaries.decide([], "stranger", trusted), "passed")
+        self.assertEqual(boundaries.decide(["bad"], "maint", trusted), "failed")
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -14,7 +14,7 @@ Medabots AX with agbcc. Read them with these differences in mind:
   that only applied to the Medabots build.
 
 Found a new trick? Open an issue with the tip and the function it helped. Tips are not
-part of claim or solve PRs.
+part of claim or solve PRs, and are added only by a maintainer or from trusted contributors.
 
 ## Workflow
 - [T40] `python3 tools/check.py --asm ADDR` shows the function. A function over ~2 KB uses `bl`

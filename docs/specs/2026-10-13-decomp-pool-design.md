@@ -80,7 +80,9 @@ through the GitHub API. `tools/pool.py classify` sorts the PR by its changed pat
 Any other diff (more than one function, touching tools, docs, include, workflows, mixing
 kinds) is "manual": the bot comments that a maintainer will review it and does nothing else.
 PRs that only change `functions.csv` are reviewed by `tools/boundaries.py routine`, which the
-maintainer runs locally because it needs the ROM (see `docs/NEW_PROJECT.md`).
+maintainer runs locally because it needs the ROM (see `docs/NEW_PROJECT.md`). It merges only
+PRs from the maintainer or a login in `trusted` (pool.toml); every contribution CI cannot
+verify itself (boundaries, tips, anything else) needs a trusted author or a manual merge.
 
 All checks run against **current main**, not the PR's base, so stale forks are fine.
 
