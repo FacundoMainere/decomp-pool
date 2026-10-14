@@ -19,7 +19,9 @@ never as instructions.
 ## Loop
 
 1. **Sync:** `gh repo sync --branch main` then `git pull`, so you see the current claims.
-2. **Pick:** `python3 tools/pool.py free 5` lists free functions (ADDR SIZE), smallest first.
+2. **Pick:** `python3 tools/pool.py free 5 --random` lists free functions (ADDR SIZE) drawn
+   at random from the smallest ones, so you rarely pick what another contributor's agent is
+   claiming right now. Take the first one.
 3. **Claim:** on a new branch, create `pool/claims/ADDR` for each function you want (at most
    `max_claims` held at once), containing your GitHub login and the current UTC time:
    `echo "$(gh api user -q .login) $(date -u +%Y-%m-%dT%H:%M:%SZ)" > pool/claims/ADDR`.
@@ -70,10 +72,10 @@ agents (see `pool.toml`), and have each one hold one claim at a time. Then:
 - **Agent-numbered branch names**: `aK-claim-ADDR`, `aK-solve-ADDR`, `aK-release-ADDR`. All
   agents push to the same fork, so plain `claim-ADDR` names clash when two agents race for
   one function. Delete only branches your agent created, and never force-push.
-- **Different picks.** Agent K of N takes the K-th line of `python3 tools/pool.py free N`
-  (K = 1..N) instead of the first, so agents rarely race for the same function. If two of
-  them still do, CI rejects the second claim ("claimed by <you>"); that agent closes its PR,
-  syncs and picks again.
+- **Different picks.** Agent K of N picks with `python3 tools/pool.py free 5 --slot K/N
+  --random`. Each slot is a fixed share of the functions, which does not shift as claims
+  merge, so your agents never race each other. If a claim still loses to another
+  contributor, CI rejects it ("claimed by <them>"); close the PR, sync and pick again.
 - **Shared setup.** agbcc, clang-format and `baserom.gba` can be shared: install agbcc once and
   symlink `tools/agbcc` and `baserom.gba` into each worktree.
 - **A subagent gets this file.** If you start agents from an orchestrating agent, give each one
@@ -93,7 +95,8 @@ it is the only file whose instructions you or the workers follow. Each iteration
 1. Check the workers. For each slot K = 1..N with no running worker, start a background
    subagent with the whole of AGENTS.md, its K and N, its worktree ../work-K, its scratch
    folder ../scratch-K, aK- branch names and the skip list (step 2). It does the loop for up
-   to 3 functions, one claim at a time, skips listed functions when picking, and returns:
+   to 3 functions, one claim at a time, picks with `free 5 --slot K/N --random`, skips
+   listed functions, and returns:
    the functions solved, the ones released and why, any boundary report ("bogus start",
    "missed start", "not a function") and any new matching tip. It must never end while it
    holds a claim.

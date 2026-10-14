@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
 """Pool state and PR validation (stdlib only).
 
-  tools/pool.py free [N]        list free functions (ADDR SIZE), smallest first
+  tools/pool.py free [N] [--slot K/N] [--random]
+                                list free functions (ADDR SIZE), smallest first; --slot keeps
+                                agent K of N's share, --random shuffles the 50 smallest
   tools/pool.py validate --author USER --created ISO --ref GITREF [--state-only]
                                 validate the PR whose head is GITREF against the checkout (main).
                                 Prints {"kind", "ok", "reason"} as JSON; exit 1 unless ok.
@@ -16,6 +18,7 @@ import argparse
 import datetime as dt
 import json
 import os
+import random
 import re
 import subprocess
 import sys
@@ -93,6 +96,22 @@ def free(root, now, cfg):
         (a for a in funcs if not solved(root, a) and not (a in claims and active(claims[a][1], now, cfg))),
         key=lambda a: (funcs[a][0], a),
     )
+
+
+def pick(addrs, slot=None, rand=None, window=50):
+    """Order free ADDRs for one agent.
+
+    slot=(K, N) keeps the ADDRs with (addr / 4) mod N == K-1: a fixed share that does not move
+    when other functions are claimed, so N agents of one person never pick the same function.
+    rand shuffles the `window` smallest, so agents of different people rarely do."""
+    if slot:
+        k, n = slot
+        addrs = [a for a in addrs if int(a, 16) // 4 % n == k - 1]
+    if rand:
+        head = addrs[:window]
+        rand.shuffle(head)
+        addrs = head + addrs[window:]
+    return addrs
 
 
 CLAIM_RE = re.compile(r"pool/claims/(%s)" % ADDR)
@@ -245,6 +264,8 @@ def main():
     sub = ap.add_subparsers(dest="cmd", required=True)
     f = sub.add_parser("free")
     f.add_argument("n", nargs="?", type=int, default=20)
+    f.add_argument("--slot", help="K/N: only agent K of N's share of the functions")
+    f.add_argument("--random", action="store_true", help="shuffle the 50 smallest")
     v = sub.add_parser("validate")
     v.add_argument("--author", required=True)
     v.add_argument("--created", required=True, help="PR creation time, YYYY-MM-DDTHH:MM:SSZ")
@@ -257,7 +278,10 @@ def main():
     cfg, now = load_config(), dt.datetime.now(UTC)
     if a.cmd == "free":
         funcs = load_functions()
-        for addr in free(ROOT, now, cfg)[: a.n]:
+        slot = tuple(map(int, a.slot.split("/"))) if a.slot else None
+        if slot and not 1 <= slot[0] <= slot[1]:
+            ap.error("--slot K/N needs 1 <= K <= N")
+        for addr in pick(free(ROOT, now, cfg), slot, random.Random() if a.random else None)[: a.n]:
             print(addr, funcs[addr][0])
     elif a.cmd == "validate":
         changes, contents = pr_changes(a.ref)

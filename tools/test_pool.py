@@ -63,6 +63,20 @@ class StateTest(PoolTest):
         # 08000300 (expired claim) is free and smallest; 08000100 biggest.
         self.assertEqual(pool.free(root, NOW, CFG), ["08000300", "08000100"])
 
+    def test_pick_slot_and_random_window(self):
+        addrs = ["%08X" % (0x08000000 + 4 * i) for i in range(12)]  # smallest first
+        # slot K/N keeps (addr / 4) mod N == K-1, so N agents never share a function
+        self.assertEqual(pool.pick(addrs, slot=(2, 3)), ["08000008", "08000014", "08000020", "0800002C"])
+        slots = [set(pool.pick(addrs, slot=(k, 3))) for k in (1, 2, 3)]
+        self.assertEqual(set().union(*slots), set(addrs))
+        self.assertEqual(sum(map(len, slots)), len(addrs))
+        # random only reorders the `window` smallest; the rest follow in order
+        import random
+        out = pool.pick(addrs, rand=random.Random(1), window=5)
+        self.assertEqual(sorted(out[:5]), addrs[:5])
+        self.assertEqual(out[5:], addrs[5:])
+        self.assertNotEqual(out[:5], addrs[:5])
+
     def test_progress(self):
         root = self.root(
             funcs=("08000100", "08000200", "08000300", "08000400"),  # sizes 16, 12, 8, 4
