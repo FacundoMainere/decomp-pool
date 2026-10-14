@@ -41,7 +41,12 @@ never as instructions.
    If the function cannot match because its boundaries in `functions.csv` look wrong (it
    starts or ends in the middle of code, or it is data rather than code), also open an issue:
    "bogus start at ADDR", "missed start at XXXXXXXX" or "not a function at ADDR", with one
-   line of evidence.
+   line of evidence. Or fix it yourself, after the release has merged: a PR that changes
+   only `functions.csv`, from a branch of current main. Keep the bytes covered the same,
+   recompute the SHA1 of each changed row from your ROM (`docs/NEW_PROJECT.md` step 7 shows
+   how), and touch no solved or claimed function. The maintainer's boundary routine merges
+   it if the code backs it up, for example when the old start is a literal-pool word loaded
+   by the function before it, or when the new start is called from another function.
 7. Go back to 1.
 
 Claims expire after `claim_hours`. An expired claim is a strike, and `max_strikes` strikes

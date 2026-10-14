@@ -186,6 +186,36 @@ check Settings -> Actions -> General -> "Fork pull request workflows in private 
 
 ## How contributors report problems
 
-Contributors cannot change `functions.csv`. If a function is impossible because of a bad
-boundary, they release it and open an issue saying so ("bogus start at X", "missed start at
-X"). Fix the row on main; their next claim sees the new list.
+If a function is impossible because of a bad boundary, contributors release it and either
+open an issue ("bogus start at X", "missed start at X", "not a function at X") or a PR that
+changes only `functions.csv`. Fix issues on main yourself; their next claim sees the new
+list.
+
+Boundary PRs need the ROM to check, so CI leaves them alone ("manual"). Review them with the
+boundary routine on your machine, which has `baserom.gba`:
+
+```sh
+python3 tools/boundaries.py routine --dry-run   # show the verdicts only
+python3 tools/boundaries.py routine             # merge the proven ones, comment on the rest
+```
+
+A PR is merged only when:
+- its rows cover the same bytes as before;
+- every changed row has the ROM's SHA1;
+- it touches no solved or claimed function;
+- the code backs up every moved boundary: a removed start is a literal-pool word loaded by
+  the function before it; an added start is called from another function, is a function
+  pointer in the code, or is where code resumes after such a pool; and no changed row hides
+  a call target.
+
+Anything else (removing rows, merging fake starts or nested functions) gets a comment with
+the reasons and waits for you. Each PR head is commented on once, so the routine can run
+often. Run it periodically, for example from cron every three hours (cron has no keyring,
+so give `gh` a token):
+
+```
+0 */3 * * * cd /path/to/GAME-decomp && GH_TOKEN=... python3 tools/boundaries.py routine >> boundaries.log 2>&1
+```
+
+Or leave a Claude Code session running
+`/loop 3h run python3 tools/boundaries.py routine and summarise what it merged`.

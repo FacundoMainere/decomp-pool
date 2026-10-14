@@ -79,6 +79,8 @@ through the GitHub API. `tools/pool.py classify` sorts the PR by its changed pat
 
 Any other diff (more than one function, touching tools, docs, include, workflows, mixing
 kinds) is "manual": the bot comments that a maintainer will review it and does nothing else.
+PRs that only change `functions.csv` are reviewed by `tools/boundaries.py routine`, which the
+maintainer runs locally because it needs the ROM (see `docs/NEW_PROJECT.md`).
 
 All checks run against **current main**, not the PR's base, so stale forks are fine.
 
