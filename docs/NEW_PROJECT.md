@@ -8,6 +8,9 @@ The result is a repository where `functions.csv` lists the functions to decompil
 contributors claim and solve them through PRs (see `AGENTS.md`). It is not a full ROM build:
 integrating `src/func_ADDR.c` into one comes later, once enough code exists.
 
+`docs/STRATEGY.md` has the lessons behind these steps and what comes after them. Tick off the
+steps in `docs/PROGRESS.md` as you go, and fill in its target line and exceptions table.
+
 ## 1. Create the repository
 
 ```sh
@@ -148,7 +151,7 @@ step 11 submits them through the pool.
 Edit the README title and description for the game, then commit and push:
 
 ```sh
-git add functions.csv pool.toml README.md
+git add functions.csv pool.toml README.md docs/PROGRESS.md
 git commit -m "Pool for GAME"
 git push
 tools/configure_repo.sh OWNER/GAME-decomp CONTRIBUTOR1 CONTRIBUTOR2

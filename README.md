@@ -7,6 +7,9 @@ and merges automatically. Nobody spends tokens or time reviewing routine contrib
 
 - **Contributing:** see [CONTRIBUTING.md](CONTRIBUTING.md) and [AGENTS.md](AGENTS.md).
 - **Starting a new game:** see [docs/NEW_PROJECT.md](docs/NEW_PROJECT.md).
+- **Progress:** [docs/PROGRESS.md](docs/PROGRESS.md), or `python3 tools/pool.py progress`.
+- **Matching tips and strategy:** [docs/MATCHING_TIPS.md](docs/MATCHING_TIPS.md),
+  [docs/STRATEGY.md](docs/STRATEGY.md).
 - **Design:** [docs/specs/2026-10-13-decomp-pool-design.md](docs/specs/2026-10-13-decomp-pool-design.md).
 
 ## How it works

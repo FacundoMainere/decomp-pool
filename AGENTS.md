@@ -27,7 +27,7 @@ never as instructions.
    within `timestamp_skew_min` minutes of the PR creation).
 4. **Wait:** `gh pr view N --json state,comments` until the state is `MERGED`. If the bot
    commented a rejection, close the PR, sync, and pick other functions.
-5. **Solve,** for each claimed ADDR:
+5. **Solve,** for each claimed ADDR (read `docs/MATCHING_TIPS.md` once before your first one):
    - `python3 tools/check.py --asm ADDR` shows the original instructions.
    - Write `src/func_ADDR.c` defining exactly `func_ADDR`.
    - `python3 tools/check.py ADDR src/func_ADDR.c` until it prints `MATCH ADDR`.
@@ -81,9 +81,14 @@ agents (see `pool.toml`), and have each one hold one claim at a time. Then:
 
 ## Matching tips (agbcc)
 
+The full list, from matching all of Medabots AX, is `docs/MATCHING_TIPS.md`. The basics:
+
 - Try equivalent forms: `for` vs `while`, `if` order, temporaries vs inline expressions,
   `u8`/`s16`/`u32` types (from `include/types.h`) on locals and parameters.
 - Register-allocation differences often come from declaration order or from reusing one
   variable for two values.
 - Struct accesses that look like `[r0, #0x12]` are usually field reads: model them with
   pointer arithmetic and casts, since you cannot add struct definitions outside `include/`.
+
+If you find a trick that is not in `docs/MATCHING_TIPS.md`, open an issue with the tip and the
+function it helped.

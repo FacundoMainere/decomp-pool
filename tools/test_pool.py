@@ -63,6 +63,16 @@ class StateTest(PoolTest):
         # 08000300 (expired claim) is free and smallest; 08000100 biggest.
         self.assertEqual(pool.free(root, NOW, CFG), ["08000300", "08000100"])
 
+    def test_progress(self):
+        root = self.root(
+            funcs=("08000100", "08000200", "08000300", "08000400"),  # sizes 16, 12, 8, 4
+            claims={"08000400": "juan " + ts(1), "08000300": "ema " + ts(49)},
+            solved=("08000200",),
+        )
+        self.assertEqual(
+            pool.progress(root, NOW, CFG),
+            {"functions": 4, "bytes": 40, "solved": 1, "solved_bytes": 12, "claimed": 1},
+        )
 
 
 def claim_pr(root, addrs, author="juan", user=None, when=None, status="A"):

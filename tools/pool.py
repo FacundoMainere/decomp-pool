@@ -6,6 +6,7 @@
                                 validate the PR whose head is GITREF against the checkout (main).
                                 Prints {"kind", "ok", "reason"} as JSON; exit 1 unless ok.
   tools/pool.py expire          delete expired claims and add strikes (run by the cron)
+  tools/pool.py progress        solved bytes and functions, and active claims
 
 State is only files: functions.csv, pool/claims/ADDR ("<user> <timestamp>"),
 pool/strikes/USER ("<count>"), src/func_ADDR.c. See docs/specs for the rules.
@@ -95,6 +96,18 @@ def free(root, now, cfg):
 
 CLAIM_RE = re.compile(r"pool/claims/(%s)" % ADDR)
 SOLVE_RE = re.compile(r"src/func_(%s)\.c" % ADDR)
+
+
+def progress(root, now, cfg):
+    funcs, claims = load_functions(root), read_claims(root)
+    done = [a for a in funcs if solved(root, a)]
+    return {
+        "functions": len(funcs),
+        "bytes": sum(size for size, _ in funcs.values()),
+        "solved": len(done),
+        "solved_bytes": sum(funcs[a][0] for a in done),
+        "claimed": sum(1 for a, (_, t) in claims.items() if a in funcs and a not in done and active(t, now, cfg)),
+    }
 
 
 def classify(changes):
@@ -212,6 +225,7 @@ def main():
     v.add_argument("--ref", required=True, help="git ref of the PR head")
     v.add_argument("--state-only", action="store_true", help="skip compiling (claims, the merge re-check)")
     sub.add_parser("expire")
+    sub.add_parser("progress")
     a = ap.parse_args()
     cfg, now = load_config(), dt.datetime.now(UTC)
     if a.cmd == "free":
@@ -223,6 +237,11 @@ def main():
         kind, errs = validate(ROOT, changes, contents, a.author, parse_ts(a.created), now, cfg, a.state_only)
         print(json.dumps({"kind": kind, "ok": not errs, "reason": "\n".join(errs)[:3000]}))
         return 1 if errs else 0
+    elif a.cmd == "progress":
+        p = progress(ROOT, now, cfg)
+        pct = 100.0 * p["solved_bytes"] / p["bytes"] if p["bytes"] else 0.0
+        print("%d / %d bytes solved (%.2f%%), %d / %d functions, %d claimed"
+              % (p["solved_bytes"], p["bytes"], pct, p["solved"], p["functions"], p["claimed"]))
     else:
         for addr, user in expire(ROOT, now, cfg):
             print("expired %s (%s)" % (addr, user))
