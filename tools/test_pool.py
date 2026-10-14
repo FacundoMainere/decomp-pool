@@ -115,6 +115,8 @@ class ClassifyTest(unittest.TestCase):
         self.assertEqual(c([("M", "pool/claims/08000100")]), "claim")
         self.assertEqual(c([("D", "pool/claims/08000100")]), "release")
         self.assertEqual(c([("A", "src/func_08000100.c"), ("D", "pool/claims/08000100")]), "solve")
+        self.assertEqual(c([("A", "src/func_08000100.c"), ("A", "src/func_08000100.cflags"),
+                            ("D", "pool/claims/08000100")]), "solve")
 
     def test_manual(self):
         c = pool.classify
@@ -129,6 +131,9 @@ class ClassifyTest(unittest.TestCase):
             [("A", "src/func_08000100.c"), ("D", "pool/claims/08000100"), ("A", "src/func_08000200.c")],
             [("A", "pool/claims/0800010a")],
             [("A", "pool/strikes/juan")],
+            [("A", "src/func_08000100.cflags"), ("D", "pool/claims/08000100")],
+            [("A", "src/func_08000100.c"), ("A", "src/func_08000200.cflags"), ("D", "pool/claims/08000100")],
+            [("A", "src/func_08000100.c"), ("M", "src/func_08000100.cflags"), ("D", "pool/claims/08000100")],
         ):
             self.assertEqual(c(changes), "manual", changes)
 

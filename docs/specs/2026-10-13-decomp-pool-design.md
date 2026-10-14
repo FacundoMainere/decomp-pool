@@ -75,7 +75,7 @@ through the GitHub API. `tools/pool.py classify` sorts the PR by its changed pat
 |---|---|---|
 | claim | only adds `pool/claims/ADDR` files | each file is exactly `<author> <timestamp>`, author = PR author; timestamp not in the future and within `timestamp_skew_min` of PR creation; ADDR in `functions.csv`; ADDR free on current main; held + new <= `max_claims`; author not banned |
 | release | only deletes `pool/claims/ADDR` files | each deleted claim belongs to the PR author |
-| solve | adds exactly `src/func_ADDR.c` and deletes `pool/claims/ADDR` | the claim belongs to the PR author and has not expired; the source, object, lint and hash checks below |
+| solve | adds exactly `src/func_ADDR.c` (plus optionally `src/func_ADDR.cflags`: one line of flags from `allowed_cflags`, replacing `cflags`) and deletes `pool/claims/ADDR` | the claim belongs to the PR author and has not expired; the source, object, lint and hash checks below |
 
 Any other diff (more than one function, touching tools, docs, include, workflows, mixing
 kinds) is "manual": the bot comments that a maintainer will review it and does nothing else.

@@ -36,8 +36,13 @@ never as instructions.
    - Write `src/func_ADDR.c` defining exactly `func_ADDR`.
    - `python3 tools/check.py ADDR src/func_ADDR.c` until it prints `MATCH ADDR`.
    - `clang-format -i src/func_ADDR.c` and check again.
-   - On a new branch from upstream main: add the file, `git rm pool/claims/ADDR`, commit, push,
-     and open one PR for that one function. It merges automatically if CI agrees.
+   - If it only matches with other compiler flags (for example a leaf that keeps
+     `push {lr}`, which needs no `-fprologue-bugfix`), write them on one line in
+     `src/func_ADDR.cflags`: the full list, replacing `cflags` from `pool.toml`, using only
+     flags from `allowed_cflags`. `check.py` picks the file up. Do not open an issue for it.
+   - On a new branch from upstream main: add the file (and its `.cflags`, if any),
+     `git rm pool/claims/ADDR`, commit, push, and open one PR for that one function. It
+     merges automatically if CI agrees.
 6. **Give up** on a function that does not match after about 30 minutes: open a PR that only
    deletes `pool/claims/ADDR`. Releasing costs nothing.
    If the function cannot match because its boundaries in `functions.csv` look wrong (it
@@ -120,7 +125,8 @@ left in `pool/claims` before it expires.
 ## Rules (exactly what CI enforces)
 
 - One PR is one of: a claim (only adds or re-creates claim files), a release (only deletes
-  your claim files), or a solve (adds one `src/func_ADDR.c` and deletes your claim on it).
+  your claim files), or a solve (adds one `src/func_ADDR.c`, optionally its `src/func_ADDR.cflags`, and
+  deletes your claim on it).
   Anything else is left for a maintainer and never merged automatically.
 - Solve source: no comments, no `asm`/`__asm__`/`__attribute__`/`_Pragma`, no preprocessor
   directive except `#include "X"` of a file in `include/`, no digraphs/trigraphs, at most

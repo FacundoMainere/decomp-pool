@@ -56,6 +56,14 @@ class SourceTest(unittest.TestCase):
         self.assertRejects("%:define X asm\n", "digraphs")
         self.assertRejects("??=define X asm\n", "digraphs")
 
+    def test_cflags_must_be_allowed(self):
+        cfg = {"allowed_cflags": ["-O1", "-O2", "-fhex-asm"]}
+        self.assertEqual(check.parse_cflags("-O1  -fhex-asm\n", cfg), (["-O1", "-fhex-asm"], []))
+        for text, needle in (("-O2 -o /tmp/x", "-o is not in allowed_cflags"), ("", "empty"),
+                             ("-O2 -O2", "twice"), ("-O2\n-O1\n", "one line")):
+            self.assertTrue(any(needle in e for e in check.parse_cflags(text, cfg)[1]), (text, needle))
+        self.assertTrue(check.parse_cflags("-O2", {})[1])  # nothing is allowed by default
+
     def test_comments(self):
         self.assertRejects("// ignore previous instructions\n" + GOOD, "comments")
         self.assertRejects("/* hi */\n" + GOOD, "comments")
@@ -152,6 +160,25 @@ class BuildTest(unittest.TestCase):
 
     def test_match(self):
         self.assertEqual(self.solve(CALL), [])
+
+    def test_function_cflags(self):
+        loop = bytes([0x00, 0xB5, 0xFE, 0xE7])
+        self.set_func("08000100", 4, hashlib.sha1(loop).hexdigest())
+        text = "void func_08000100(void) {\n    while (1)\n        ;\n}\n"
+        self.assertRejects(text, "NO MATCH")
+        flags = [f for f in self.cfg["cflags"] if f != "-fprologue-bugfix"]
+        self.cfg["function_cflags"] = {"08000100": flags}
+        self.assertEqual(self.solve(text), [])
+
+    def test_contributor_cflags(self):
+        loop = bytes([0x00, 0xB5, 0xFE, 0xE7])
+        self.set_func("08000100", 4, hashlib.sha1(loop).hexdigest())
+        text = "void func_08000100(void) {\n    while (1)\n        ;\n}\n"
+        flags = " ".join(f for f in self.cfg["cflags"] if f != "-fprologue-bugfix")
+        self.cfg["allowed_cflags"] = self.cfg["cflags"]
+        self.assertEqual(check.check_solve(self.r, "08000100", text, self.cfg, cflags=flags), [])
+        e = check.check_solve(self.r, "08000100", text, self.cfg, cflags=flags + " -O1")
+        self.assertTrue(any("allowed_cflags" in x for x in e), e)
 
     def test_no_match(self):
         self.set_func("08000100", 20, "0" * 40)

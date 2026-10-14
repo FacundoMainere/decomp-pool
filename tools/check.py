@@ -4,6 +4,8 @@
   tools/check.py ADDR FILE.c   source rules, clang-format, compile with agbcc, object rules,
                                link at ADDR and compare with the SHA1 in functions.csv.
                                With baserom.gba present, a mismatch prints a side-by-side diff.
+                               If FILE.cflags exists (e.g. src/func_ADDR.cflags), its one line
+                               of flags replaces cflags; each flag must be in allowed_cflags.
   tools/check.py --asm ADDR    disassemble the original function from baserom.gba
 """
 import hashlib
@@ -49,6 +51,19 @@ def check_source(text, root, cfg):
             if not m or not p.startswith(inc + os.sep) or not os.path.isfile(p):
                 errs.append('only #include "X" of a file in include/ is allowed: %s' % line.strip())
     return list(dict.fromkeys(errs))
+
+
+def parse_cflags(text, cfg):
+    """A .cflags file: one line of flags, each listed in allowed_cflags. Returns (flags, errors)."""
+    if text.strip().count("\n"):
+        return [], ["the .cflags file must be one line"]
+    flags, allowed = text.split(), cfg.get("allowed_cflags", [])
+    errs = ["%s is not in allowed_cflags in pool.toml" % f for f in flags if f not in allowed]
+    if not flags:
+        errs.append("the .cflags file is empty")
+    if len(set(flags)) != len(flags):
+        errs.append("a flag is given twice in the .cflags file")
+    return flags, errs
 
 
 class CheckError(Exception):
@@ -99,12 +114,14 @@ def check_object(o, addr, cfg):
     return errs
 
 
-def build(path, addr, root, cfg, d):
-    """Compile path and link it at addr. Returns the .text bytes. Raises CheckError."""
+def build(path, addr, root, cfg, d, cflags=None):
+    """Compile path (with cflags, or pool.toml's for addr) and link it at addr. Returns the .text
+    bytes. Raises CheckError."""
     pp = run(["cpp", "-nostdinc", "-undef", "-I", os.path.join(root, "include"),
               "-I", os.path.join(root, "tools", "agbcc", "include"), path])
     s, o, so, elf, b = (os.path.join(d, x) for x in ("f.s", "f.o", "syms.o", "f.elf", "f.bin"))
-    run([os.path.join(root, cfg["compiler"])] + cfg["cflags"] + ["-o", s], input=pp)
+    cflags = cflags or cfg.get("function_cflags", {}).get("%08X" % addr, cfg["cflags"])
+    run([os.path.join(root, cfg["compiler"])] + cflags + ["-o", s], input=pp)
     with open(s, "a") as f:
         f.write("\t.align 2, 0\n")
     run(["arm-none-eabi-as", "-mcpu=arm7tdmi", "-o", o, s])
@@ -152,12 +169,17 @@ def side_by_side(want, got, addr, d):
     return "\n".join(rows)
 
 
-def check_solve(root, addr, text, cfg, rom=None):
-    """All solve checks for func_ADDR with source text. Returns a list of errors (empty = MATCH)."""
+def check_solve(root, addr, text, cfg, rom=None, cflags=None):
+    """All solve checks for func_ADDR with source text and the text of its .cflags file, if any.
+    Returns a list of errors (empty = MATCH)."""
     funcs = pool.load_functions(root)
     if addr not in funcs:
         return ["%s is not in functions.csv" % addr]
     errs = check_source(text, root, cfg)
+    flags = None
+    if cflags is not None:
+        flags, e = parse_cflags(cflags, cfg)
+        errs += e
     if errs:
         return errs
     size, sha1 = funcs[addr]
@@ -167,7 +189,7 @@ def check_solve(root, addr, text, cfg, rom=None):
             f.write(text)
         errs = check_lint(path, root)
         try:
-            got = build(path, int(addr, 16), root, cfg, d)
+            got = build(path, int(addr, 16), root, cfg, d, flags)
         except CheckError as e:
             return errs + [str(e)]
         if compare(got, size, sha1):
@@ -205,8 +227,12 @@ def main(argv):
             print("\n".join(disasm(rom[off:off + size], int(addr, 16), d)))
         return 0
     addr = argv[0].upper()
+    cflags = None
+    if os.path.exists(os.path.splitext(argv[1])[0] + ".cflags"):
+        with open(os.path.splitext(argv[1])[0] + ".cflags") as f:
+            cflags = f.read()
     with open(argv[1]) as f:
-        errs = check_solve(root, addr, f.read(), cfg, rom)
+        errs = check_solve(root, addr, f.read(), cfg, rom, cflags)
     print("\n".join(errs) if errs else "MATCH %s" % addr)
     return 1 if errs else 0
 

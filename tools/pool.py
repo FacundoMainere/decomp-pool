@@ -116,6 +116,7 @@ def pick(addrs, slot=None, rand=None, window=50):
 
 CLAIM_RE = re.compile(r"pool/claims/(%s)" % ADDR)
 SOLVE_RE = re.compile(r"src/func_(%s)\.c" % ADDR)
+CFLAGS_RE = re.compile(r"src/func_(%s)\.cflags" % ADDR)
 
 
 def progress(root, now, cfg):
@@ -159,15 +160,18 @@ def classify(changes):
     """[(status, path)] -> 'claim' | 'release' | 'solve' | 'manual'."""
     claims = [(s, CLAIM_RE.fullmatch(p)[1]) for s, p in changes if CLAIM_RE.fullmatch(p)]
     solves = [(s, SOLVE_RE.fullmatch(p)[1]) for s, p in changes if SOLVE_RE.fullmatch(p)]
-    if not changes or len(claims) + len(solves) != len(changes):
+    flags = [(s, CFLAGS_RE.fullmatch(p)[1]) for s, p in changes if CFLAGS_RE.fullmatch(p)]
+    if not changes or len(claims) + len(solves) + len(flags) != len(changes):
         return "manual"
     if not solves:
+        if flags:
+            return "manual"
         if all(s in "AM" for s, _ in claims):
             return "claim"
         if all(s == "D" for s, _ in claims):
             return "release"
         return "manual"
-    if len(solves) == 1 and solves[0][0] == "A" and claims == [("D", solves[0][1])]:
+    if len(solves) == 1 and solves[0][0] == "A" and claims == [("D", solves[0][1])] and flags in ([], [("A", solves[0][1])]):
         return "solve"
     return "manual"
 
@@ -227,7 +231,8 @@ def validate(root, changes, contents, author, created, now, cfg, state_only=Fals
         if not errs and not state_only:
             import check
 
-            errs += check.check_solve(root, a, contents["src/func_%s.c" % a], cfg)
+            errs += check.check_solve(root, a, contents["src/func_%s.c" % a], cfg,
+                                      cflags=contents.get("src/func_%s.cflags" % a))
     return kind, errs
 
 

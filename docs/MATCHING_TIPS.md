@@ -7,9 +7,10 @@ Medabots AX with agbcc. Read them with these differences in mind:
   `func_XXXXXXXX` here.
 - **No banned constructs:** `__attribute__`, `asm` and comments are rejected by this pool's CI,
   so tips that relied on them were removed.
-- **One compiler setting:** the pool compiles every function with the same `compiler` and
-  `cflags` (`-O2 -fprologue-bugfix`). If a function only matches with other flags (`-O1`,
-  `-mno-thumb-interwork`), release it and open an issue saying which flags matched.
+- **Compiler flags:** the pool compiles every function with `cflags` from `pool.toml`
+  (`-O2 -fprologue-bugfix`). If a function only matches with other flags (`-O1`,
+  `-mno-thumb-interwork`, no `-fprologue-bugfix`), put the full list in
+  `src/func_ADDR.cflags` (flags from `allowed_cflags` only) and include it in the solve PR.
 - **Tip IDs:** IDs are kept so tips can be referenced; gaps are tips that were retired or
   that only applied to the Medabots build.
 

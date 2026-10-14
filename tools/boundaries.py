@@ -149,7 +149,7 @@ def main_state():
     """functions.csv rows, solved ADDRs and claimed ADDRs on origin/main."""
     rows = parse_rows(git("show", "origin/main:functions.csv"))
     names = git("ls-tree", "--name-only", "origin/main", "src/", "pool/claims/").split()
-    solved = {p[len("src/func_"):-2] for p in names if p.startswith("src/func_")}
+    solved = {p[len("src/func_"):-2] for p in names if p.startswith("src/func_") and p.endswith(".c")}
     claimed = {p[len("pool/claims/"):] for p in names if p.startswith("pool/claims/") and p != "pool/claims/.gitkeep"}
     return rows, solved, claimed
 
